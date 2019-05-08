@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>P2P:Dashboard</title>
+    <link rel="stylesheet" type="text/css" href="styles.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jdenticon@2.1.1" async></script>
+</head>
+<body>
+    <div class="container">
+        <div id="nav">
+            <svg data-jdenticon-value="{{username}}" width="80" height="80">
+                Fallback text or image for browsers not supporting inline svg.
+            </svg>
+            <h2>{{username}}</h2>
+            <a href="/logout" class="button">Logout</a>
+        </div>
+        <div class="side">
+            <div class="userList">
+                <h2>Online Users</h2>
+                <input type="text" id="findUser" placeholder="Search by username"><br>
+                <div id="queryPlaceholder" style="display:none;">
+                    <!-- Scripted -->
+                </div>
+                <div id="users">
+                    <!-- Scripted -->
+                </div>
+            </div>
+        </div>
+        <div class="chat disabled">
+            <div id="chatWindow"><!-- Scripted --></div>
+            <form class="messageForm">
+                <input type="textarea" class="message" name="message" autocomplete="off" autofocus>
+                <div class="buttonInside"><input type="submit" class="submit" value="➤"></div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

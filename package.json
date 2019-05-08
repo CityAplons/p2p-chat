@@ -1,0 +1,42 @@
+{
+  "name": "p2p-chat",
+  "version": "0.0.1",
+  "description": "Web chat based on p2p protocol using WebRTC",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CityAplons/p2p-chat.git"
+  },
+  "keywords": [
+    "chat",
+    "p2p",
+    "webrtc",
+    "node",
+    "jquery"
+  ],
+  "author": "Nikita Mikhailovskiy",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/CityAplons/p2p-chat/issues"
+  },
+  "homepage": "https://github.com/CityAplons/p2p-chat#readme",
+  "dependencies": {
+    "bcrypt": "^3.0.6",
+    "body-parser": "^1.19.0",
+    "cookie-parser": "^1.4.4",
+    "crypto": "^1.0.1",
+    "dotenv": "^8.0.0",
+    "express": "^4.16.4",
+    "express-handlebars": "^3.0.2",
+    "express-session": "^1.16.1",
+    "jdenticon": "^2.1.1",
+    "passport": "^0.4.0",
+    "passport-local": "^1.0.0",
+    "pg": "^7.10.0",
+    "sequelize": "^5.8.5",
+    "socket.io": "^2.2.0"
+  }
+}

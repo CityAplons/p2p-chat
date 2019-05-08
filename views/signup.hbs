@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>P2P chat</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" type="text/css" href="styles.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300" rel="stylesheet">
+</head>
+ 
+<body>
+    <div id="formal">
+        <form id="signup" name="signup" method="post" action="/signup">
+            <label for="username">Username</label><br>
+            <input class="text" name="username" type="text" /><br>
+            <label for="firstname">Firstname</label><br>
+            <input name="firstname" type="text" /><br>
+            <label for="lastname">Lastname</label><br>
+            <input name="lastname" type="text" /><br>
+            <label for="password">Password</label><br>
+            <input name="password" type="password" /><br>
+            <input class="btn" type="submit" value="Sign Up" />
+            <input class="btn" type="button" onclick="window.location.replace('/');" value="Cancel" />
+        </form>
+    </div>
+    <div id="ranImage"></div>
+ 
+</body>
+ 
+</html>
