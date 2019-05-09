@@ -10,33 +10,52 @@
     <script src="https://cdn.jsdelivr.net/npm/jdenticon@2.1.1" async></script>
 </head>
 <body>
-    <div class="container">
-        <div id="nav">
+    <div id="nav">
             <svg data-jdenticon-value="{{username}}" width="80" height="80">
                 Fallback text or image for browsers not supporting inline svg.
             </svg>
-            <h2>{{username}}</h2>
-            <a href="/logout" class="button">Logout</a>
+            <h2 id="user" data-id="{{id}}" class="noselect">{{username}}</h2>
+            <a href="/logout" class="button noselect">Logout</a>
         </div>
+    <div class="container">
         <div class="side">
             <div class="userList">
-                <h2>Online Users</h2>
                 <input type="text" id="findUser" placeholder="Search by username"><br>
-                <div id="queryPlaceholder" style="display:none;">
-                    <!-- Scripted -->
-                </div>
                 <div id="users">
                     <!-- Scripted -->
                 </div>
             </div>
         </div>
         <div class="chat disabled">
-            <div id="chatWindow"><!-- Scripted --></div>
+            <div id="chatWindow">
+                <!-- Scripted -->
+                <div class="message">
+                    
+                        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi nisl augue, malesuada et magna vel, eleifend hendrerit ipsum. 
+                        Ut turpis neque, condimentum eget venenatis sit amet, porta quis urna. Phasellus ipsum dolor, porttitor non luctus id, tincidunt in lectus. 
+                        Maecenas commodo enim et nisl ultricies, nec egestas turpis dictum.
+                    
+                </div>
+                <div class="message self">
+                    Etiam in ex lacinia, semper turpis quis, pharetra turpis. Nam malesuada blandit velit quis posuere. Aenean.
+                </div>
+            </div>
             <form class="messageForm">
-                <input type="textarea" class="message" name="message" autocomplete="off" autofocus>
+                <input type="textarea" class="message" name="message" autocomplete="off" autofocus disabled>
                 <div class="buttonInside"><input type="submit" class="submit" value="➤"></div>
             </form>
         </div>
     </div>
 </body>
+<script
+        src="https://code.jquery.com/jquery-3.4.1.min.js"
+        integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="
+        crossorigin="anonymous">
+</script>
+<script 
+        src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js" 
+        integrity="sha256-yr4fRk/GU1ehYJPAs8P4JlTgu0Hdsp4ZKrx8bDEDC3I=" 
+        crossorigin="anonymous">
+</script>
+<script src="client.js"></script>
 </html>

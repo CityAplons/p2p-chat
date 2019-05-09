@@ -1,11 +1,11 @@
-let express = require('express');
-let router = express.Router();
-
-let http = require('http').Server(router);
-let io = require('socket.io')(http);
-
-io.on('connection', (socket) => {
- 
-})
-
-module.exports = router;
+module.exports = function (io, usermap) {
+    io.sockets.on('connection', (socket) => {
+        let user = socket.handshake.query.user;
+        usermap[user] = socket;
+        socket.emit('users', Object.keys(usermap));
+    
+        socket.on("disconnect", function() {
+			delete usermap[user];
+		});
+    });
+};

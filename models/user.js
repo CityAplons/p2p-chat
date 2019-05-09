@@ -19,7 +19,7 @@ module.exports = function(sequelize, Sequelize) {
             allowNull: false,
             notEmpty: true
         },
-        about: {
+        public_key: {
             type: Sequelize.TEXT
         },
         password: {

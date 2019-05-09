@@ -6,7 +6,8 @@ exports.signin = function(req, res) {
 }
 exports.dashboard = function(req, res) {
     res.render('dashboard',{
-        username: req.user.username
+        username: req.user.username,
+        id: req.user.id
     });
 }
 exports.logout = function(req, res) {

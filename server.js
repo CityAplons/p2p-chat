@@ -2,6 +2,7 @@ let express = require('express');
 let exphbs = require('express-handlebars');
 let app = express();
 let http = require('http').Server(app);
+let io = require('socket.io')(http);
 
 let passport   = require('passport');
 let session    = require('express-session');
@@ -27,14 +28,18 @@ app.set('view engine', '.hbs');
 
 //Enviroment
 let env = require('dotenv').config();
+let users = {};
 
 //Socket.io router
-const socketRouter = require('./v1/socket');
-app.use('/v1/', socketRouter);
+require('./v1/socket')(io, users);
 
 //Auth router
 const authRouter = require('./v1/auth');
 app.use('/', authRouter);
+
+//Util router
+const utilRouter = require('./v1/utils');
+app.use('/', utilRouter);
 
 //Database init
 //Models
