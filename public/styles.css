@@ -238,7 +238,7 @@ div.user h4{
     overflow: hidden;
 }
 
-span.info-button {
+span.info-button, span.chat-button {
     display: flex;
     justify-content: center;
     align-items: center;
@@ -246,11 +246,11 @@ span.info-button {
     cursor: pointer;
 }
 
-span.info-button:hover {
+span.info-button:hover, span.chat-button:hover, .hovered {
     background-color:#131821;
 }
 
-div.user span.info-button{
+div.user span.info-button, div.user span.chat-button{
     height: 100%;
     flex-basis: 40px;
     flex-grow: 1;
@@ -264,6 +264,24 @@ div.user span.info-button{
 #findUser{
     width: 100%;
     margin: 0 0 8px 0;
+}
+
+div#modal{
+    display: none;
+    position: absolute;
+    min-height: 20px;
+    min-width: 100px;
+    max-width: 600px;
+    overflow: hidden;
+    background-color: aliceblue;
+    color: #131821;
+    z-index: 25;
+    padding: 5px;
+    white-space: nowrap;
+}
+
+div#modal span{
+    font-weight: bold;
 }
 
 @media all and (max-width:30em){

@@ -27,6 +27,7 @@ router.post('/:user_id/updateKey', (req, res) => {
     req.user.update({
        public_key:req.body.raw
    }).then(result => res.status(200).send(result))
+   else res.status(200).send('ok');
 });
 
 module.exports = router;
