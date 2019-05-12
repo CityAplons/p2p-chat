@@ -127,7 +127,7 @@ div.container {
 }
 
 div.side {
-    flex-grow: 3;
+    flex-grow: 1;
     height: 93vh;
     min-width: 300px;
     background-color: #1f2838;
@@ -135,7 +135,7 @@ div.side {
     z-index: 5;
 }
 div.chat{
-    flex-grow: 7;
+    flex-grow: 9;
     z-index: 3;
     overflow-y: scroll;
 }
@@ -154,6 +154,7 @@ div#users{
 div#chatWindow{
     height: 88vh;
     width: 100%;
+    padding-top:40px;
     overflow-y:auto;
 }
 
@@ -284,6 +285,15 @@ div#modal span{
     font-weight: bold;
 }
 
+#chatName {
+    position: absolute;
+    width: 100%;
+    padding: 10px 10px 10px 50px;
+    height: 40px;
+    color: black;
+    background-color: #e1e3e8;
+}
+
 @media all and (max-width:30em){
     body{
         height: auto;
@@ -307,3 +317,51 @@ div#modal span{
         height: auto;
     }
 }
+
+.abs {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    padding-left: 10px; 
+    color: #000000;
+    font-size: 20pt;
+    display: none;
+
+}
+
+.sk-spinner-pulse {
+    width: 40px;
+    height: 40px;
+    display: none;
+    margin: auto;
+    position: absolute;
+    background-color: #131821;
+    border-radius: 100%;
+    -webkit-animation: sk-spinner-pulse 1.0s infinite ease-in-out;
+            animation: sk-spinner-pulse 1.0s infinite ease-in-out;
+  }
+  
+  @-webkit-keyframes sk-spinner-pulse {
+    0% {
+      -webkit-transform: scale(0);
+              transform: scale(0);
+    }
+    100% {
+      -webkit-transform: scale(1);
+              transform: scale(1);
+      opacity: 0;
+    }
+  }
+  
+  @keyframes sk-spinner-pulse {
+    0% {
+      -webkit-transform: scale(0);
+              transform: scale(0);
+    }
+    100% {
+      -webkit-transform: scale(1);
+              transform: scale(1);
+      opacity: 0;
+    }
+  }
+  

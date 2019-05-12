@@ -13,11 +13,13 @@ $(document).ready(function (){
 
     const idb = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
     
-    let dbPromise = idb.open('clientDB', 2);
+    let dbPromise = idb.open('clientDB', 3);
  
     dbPromise.onupgradeneeded = function(event) { 
         let db = event.target.result;
         db.createObjectStore('keys', {keyPath: 'userId'});
+        let chatHistory = db.createObjectStore('messages', { keyPath: "id", autoIncrement:true });
+        chatHistory.createIndex("chatId", "chatId", { unique: false });
     };
 
     //ECDH key pairs checks and generation
@@ -234,8 +236,37 @@ $(document).ready(function (){
     $(document).on("click", ".chat-button", function (){
         const user = $(this).parent().data("id");
         const room = userId + "_" + user;
-        console.log(`Try to join ${room}`);
-        socket.emit('room', room);
+        const spinner = $(".sk-spinner-pulse");
+        const server = $("#relay-link");
+        const rtc = $("#p2p-link");
+        let chatWindow = $("#chatWindow");
+        let chatDiv = $(".chat");
+
+        //Clearing chat
+        chatDiv.removeClass("disabled");
+        chatWindow.empty();
+
+        //Load old messages
+        spinner.show();
+        loadSavedMessages(room).then( result => {
+            spinner.hide();
+            server.show();
+        });
+
+        //Fetching username
+        const username = $(this).parent().find("h4").html();
+        chatDiv.find("#chatName").html(username);
+        chatWindow.data("room", room);
+
+        //Enable message form
+        let form = $(".messageForm");
+        form.find(".message").prop("disabled", false);
+        
+        //saveMessage("1_3", "Hooray 3", 1);
+        //Connecting to RTC handler
+        //console.log(`Try to join ${room}`);
+        //socket.emit('room', room);
+
     });
 
     //load users
@@ -259,5 +290,50 @@ $(document).ready(function (){
             });
         });
     });
-    
+
+    //fetch saved messages
+    async function loadSavedMessages(chatId){
+        let dbPromise = idb.open('clientDB', 3);
+        dbPromise.onsuccess = function() {
+            let db = this.result;
+            let dbTransaction = db.transaction(["messages"]);
+            let messages = dbTransaction.objectStore("messages");
+            let index = messages.index('chatId'); 
+            let requestChatHistory = index.get(chatId);
+            requestChatHistory.openCursor().onsuccess = function(event) {
+                let cursor = event.target.result;
+                if (cursor) {
+                    console.log(cursor);
+                    cursor.continue();
+                }
+            };
+        }
+    }
+
+    //save message to local DB
+    async function saveMessage(chatId, message, userId){
+        let dbPromise = idb.open('clientDB', 3);
+        dbPromise.onsuccess = function() {
+            let db = this.result;
+            let dbTransaction = db.transaction(["messages"], 'readwrite');
+            let messages = dbTransaction.objectStore("messages");
+            let mesObj = {
+                chatId: chatId,
+                user: userId,
+                message: message,
+                timestamp: Date.now()
+            };
+            let save = messages.add(mesObj);
+            save.onerror = function(event) {
+                // Handle errors!
+                console.log("Something went wrong with local DB :(")
+            };
+            save.onsuccess = function(event) {
+                // Do something with the request.result!
+                console.log(`Message saved, id ${save.result}`);
+            };
+        }
+    }
+
+    //draw messages
 })
