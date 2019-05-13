@@ -39,7 +39,7 @@ module.exports = function (io, usermap) {
             } else if(roomNow.length === 2){
                 //Set RTC chat
                 io.to(room).emit('setRTC');
-                io.to(room).emit('ready');
+                socket.to(room).emit('ready');
             } else if(roomNow.length > 2)
                 socket.leave(room);
         });
@@ -49,6 +49,7 @@ module.exports = function (io, usermap) {
             const message = json.message;
             const from = json.from;
             const to = json.to;
+            console.log(json);
             let toSocketId = usermap[to];
             if(toSocketId !== undefined){
                 //Sending to client directly
@@ -58,7 +59,8 @@ module.exports = function (io, usermap) {
                     user: from
                 }
                 for(let index in toSocketId) {
-                    socket.to(toSocketId[index][0].id.id).emit('recieveViaSocket', answer);
+                    socket.to(toSocketId[index][0].id).emit('recieveViaSocket', answer);
+                    console.log(toSocketId[index][0].id);
                 }
             }else{
                 //Sending to temporary storage in relay database
@@ -83,7 +85,7 @@ module.exports = function (io, usermap) {
 
         socket.on('close', function(room){
             console.log('closing channel');
-            io.to(room).emit('close');
+            socket.to(room).emit('close');
             io.to(room).emit('setSocket');
         });
 

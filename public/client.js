@@ -112,19 +112,16 @@ $(document).ready(function (){
     
     //WebSocket connection to relay
     let socket = io.connect("", { query: `user=${userId}` });
-    
-    let PeerConnection = window.mozRTCPeerConnection || window.webkitRTCPeerConnection;
-    let SessionDescription = window.mozRTCSessionDescription || window.RTCSessionDescription;
-    let IceCandidate = window.mozRTCIceCandidate || window.RTCIceCandidate;
 
     //Channel controllers
+    let numOfChannels = 0;
     let Channel = {
         establishConnection: function(){
             Channel.handlePeerConnection();
             Channel.createOffer();        
         },
         handlePeerConnection: function(){
-            Channel.peerConnection = new PeerConnection({
+            Channel.peerConnection = new RTCPeerConnection({
                 iceServers: [{url: "stun:stun.l.google.com:19302" }]
             });
             Channel.peerConnection.onicecandidate = Channel.onIceCandidate;
@@ -144,7 +141,7 @@ $(document).ready(function (){
             }
         },
         onCandidate: function(candidate){
-            let rtcCandidate = new IceCandidate(candidate);
+            let rtcCandidate = new RTCIceCandidate(candidate);
             Channel.peerConnection.addIceCandidate(rtcCandidate);
         },
         createOffer: function(){
@@ -169,7 +166,7 @@ $(document).ready(function (){
             Channel.createAnswer(offer);
         },
         createAnswer: function(offer){
-            let rtcOffer = new SessionDescription(offer);
+            let rtcOffer = new RTCSessionDescription(offer);
             Channel.peerConnection.setRemoteDescription(rtcOffer);
             Channel.peerConnection.createAnswer(
                 function(answer){
@@ -186,7 +183,7 @@ $(document).ready(function (){
             );
         },
         onAnswer: function(answer){
-            let rtcAnswer = new SessionDescription(answer);
+            let rtcAnswer = new RTCSessionDescription(answer);
             Channel.peerConnection.setRemoteDescription(rtcAnswer);
         },
         createDataChannel: function(label){
@@ -201,13 +198,11 @@ $(document).ready(function (){
 
             Channel.dataChannel.onopen = function(){
                 console.log('channel opened');
-                Channel.dataChannel.send("Hello World!");
+                numOfChannels++;
             };
     
             Channel.dataChannel.onclose = function(){
                 console.log('channel closed');
-                let ans = currentRoom;
-                socket.emit('close', ans)
             };
     
         },
@@ -216,14 +211,31 @@ $(document).ready(function (){
             let receiveChannel = event.channel;
             receiveChannel.onopen = function(){
                 console.log('receive channel event open');
+                if(numOfChannels < 1) Channel.establishConnection();
             };
             receiveChannel.onmessage = function(event){
-                console.log('receive channel event: ' + event.data);
+                //Колхоз :Р
+                let room_users = currentRoom.split("_");
+                let user = "";
+                let us1 = room_users[0];
+                let us2 = room_users[1];
+                if(us1 == userId)
+                    user = us2;
+                else if(us2 == userId)
+                    user = us1;
+                //Здесь кончается
+                saveMessage(currentRoom, event.data, user);
             };
         },
         onClose: function(){
+            let ans = currentRoom;
+            socket.emit('close', ans);
+            Channel.closeChannel;
+        },
+        closeChannel: function(){
             Channel.dataChannel.close();
             Channel.peerConnection.close();
+            numOfChannels--;
         }
     };
 
@@ -238,12 +250,12 @@ $(document).ready(function (){
         });
         socket.on('answer', Channel.onAnswer);
         socket.on('offer', Channel.onOffer);
-        socket.on('close', Channel.onClose);
+        socket.on('close', Channel.closeChannel);
+    });
 
-        //Closing connection
-        $( document ).on('beforeunload',function() {
-            Channel.onClose();
-        });
+    //Closing connection
+    $( document ).on('beforeunload',function() {
+        if(chatChannel == "rtc") Channel.onClose();
     });
 
     socket.on('setSocket', () => {
@@ -268,6 +280,7 @@ $(document).ready(function (){
 
         //Clearing chat
         chatDiv.removeClass("disabled");
+        if(chatChannel == "rtc") Channel.onClose();
         chatWindow.empty();
 
         //Load old messages
@@ -314,9 +327,9 @@ $(document).ready(function (){
             let room_users = room.split("_");
             let us1 = room_users[0];
             let us2 = room_users[1];
-            if(us1 === userId)
+            if(us1 == userId)
                 json.to = us2;
-            else
+            else if(us2 == userId)
                 json.to = us1;
             //Здесь кончается
             socket.emit('sendViaSocket', json); 
