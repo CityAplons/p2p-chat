@@ -2,6 +2,8 @@ $(document).ready(function (){
     //Globals
     const username = $("#user").html();
     const userId = $("#user").data("id");
+    let chatChannel = "socket";
+    let currentRoom = "";
 
     console.log(`User: [${userId}] ${username}`);
 
@@ -111,107 +113,107 @@ $(document).ready(function (){
     //WebSocket connection to relay
     let socket = io.connect("", { query: `user=${userId}` });
     
+    let PeerConnection = window.mozRTCPeerConnection || window.webkitRTCPeerConnection;
+    let SessionDescription = window.mozRTCSessionDescription || window.RTCSessionDescription;
+    let IceCandidate = window.mozRTCIceCandidate || window.RTCIceCandidate;
+
     //Channel controllers
     let Channel = {
-        onJoin: function(room){
-            //Join to room handler
-            console.log(`Join ${room}`);
-            socket.emit('join', room);
-        },
-        onReady: function(room){
-            //Chat ready handler
-            console.log(`Ready ${room}`);
-            Channel.establishConnection(room);
-        },
-        onAnswer: function(answer){
-            let rtcAnswer = new RTCSessionDescription(JSON.parse(answer));
-            Channel.peerConnection.setRemoteDescription(rtcAnswer);
-        },
-        onOffer: function(offer){
-            console.log("Offer accepted");
+        establishConnection: function(){
             Channel.handlePeerConnection();
-            Channel.createAnswer(offer);
-        },
-        establishConnection: function(room){
-            Channel.handlePeerConnection();
-            Channel.createOffer(room);        
+            Channel.createOffer();        
         },
         handlePeerConnection: function(){
-            Channel.peerConnection = new RTCPeerConnection({
+            Channel.peerConnection = new PeerConnection({
                 iceServers: [{url: "stun:stun.l.google.com:19302" }]
             });
             Channel.peerConnection.onicecandidate = Channel.onIceCandidate;
             Channel.peerConnection.ondatachannel = Channel.receiveChannelCallback;
             socket.on('candidate', Channel.onCandidate);
         },
-        createOffer: function(room){
+        sendData: function(data){
+            Channel.dataChannel.send(data);
+        },
+        onIceCandidate: function(event){
+            if (event.candidate){
+                let ans = {
+                    room: currentRoom,
+                    candidate: event.candidate
+                }
+                socket.emit('candidate', ans);
+            }
+        },
+        onCandidate: function(candidate){
+            let rtcCandidate = new IceCandidate(candidate);
+            Channel.peerConnection.addIceCandidate(rtcCandidate);
+        },
+        createOffer: function(){
             let json = new Object();
-            json.room = room;
-            Channel.createDataChannel(room);
-            console.log('data channel created, creating offer');
+            json.room = currentRoom;
+            Channel.createDataChannel(currentRoom);
+            console.log(`data channel ${currentRoom} created, creating offer`);
             Channel.peerConnection.createOffer(
                 function(offer){
                     Channel.peerConnection.setLocalDescription(offer);
-                    json.offer = JSON.stringify(offer);
-                    socket.emit('offer', JSON.stringify(json));
+                    json.offer = offer;
+                    socket.emit('offer', json);
                 },
                 function(err){
                     console.log(err);
                 }
             );
         },
+        onOffer: function(offer){
+            console.log("Offer accepted");
+            Channel.handlePeerConnection();
+            Channel.createAnswer(offer);
+        },
         createAnswer: function(offer){
-            let rtcOffer = new RTCSessionDescription(JSON.parse(offer));
+            let rtcOffer = new SessionDescription(offer);
             Channel.peerConnection.setRemoteDescription(rtcOffer);
             Channel.peerConnection.createAnswer(
                 function(answer){
                     Channel.peerConnection.setLocalDescription(answer);
-                    let json = new Object();
-                    json.room = "1_2";
-                    json.answer = answer;
-                    socket.emit('answer', JSON.stringify(json));
+                    let ans = {
+                        room: currentRoom,
+                        answer: answer
+                    }
+                    socket.emit('answer', ans);
                 },
                 function(err){
                     console.log(err);
                 }
             );
         },
-        onIceCandidate: function(event){
-            if (event.candidate){
-                let json = new Object();
-                json.room = "1_2";
-                json.candidate = event.candidate;
-                socket.emit('candidate', JSON.stringify(json));
-            }
+        onAnswer: function(answer){
+            let rtcAnswer = new SessionDescription(answer);
+            Channel.peerConnection.setRemoteDescription(rtcAnswer);
         },
-        onCandidate: function(candidate){
-            rtcCandidate = new RTCIceCandidate(JSON.parse(candidate));
-            Channel.peerConnection.addIceCandidate(rtcCandidate);
-        },
-
         createDataChannel: function(label){
             console.log('creating data channel');
-            Channel.dataChannel = Channel.peerConnection.createDataChannel(label);
+            Channel.dataChannel = Channel.peerConnection.createDataChannel(label, {});
             Channel.dataChannel.onerror = function(err){
                 console.log(err);
-            }
+            };
             Channel.dataChannel.onmessage = function(event) {
                 console.log('got channel message: ' + event.data);
             };
-    
+
             Channel.dataChannel.onopen = function(){
-                Channel.dataChannel.send("Hello!");
+                console.log('channel opened');
+                Channel.dataChannel.send("Hello World!");
             };
     
             Channel.dataChannel.onclose = function(){
                 console.log('channel closed');
+                let ans = currentRoom;
+                socket.emit('close', ans)
             };
     
         },
-    
         receiveChannelCallback: function(event){
             console.log('received callback');
-            var receiveChannel = event.channel;
+            let receiveChannel = event.channel;
             receiveChannel.onopen = function(){
                 console.log('receive channel event open');
             };
@@ -219,23 +221,45 @@ $(document).ready(function (){
                 console.log('receive channel event: ' + event.data);
             };
         },
-
-        sendData: function(text){
-            Channel.dataChannel.send(text);
+        onClose: function(){
+            Channel.dataChannel.close();
+            Channel.peerConnection.close();
         }
+    };
 
-    } 
+    socket.on('setRTC', () => {
+        chatChannel = "rtc";
+        $("#relay-link").hide();
+        $("#p2p-link").show(150);
+        //Running RTC
+        //RTC client states
+        socket.on('ready', () => {
+            Channel.establishConnection()
+        });
+        socket.on('answer', Channel.onAnswer);
+        socket.on('offer', Channel.onOffer);
+        socket.on('close', Channel.onClose);
 
-    //Client ready state
-    socket.on('join', Channel.onJoin);
-    socket.on('ready', Channel.onReady);
-    socket.on('answer', Channel.onAnswer);
-    socket.on('offer', Channel.onOffer);
+        //Closing connection
+        $( document ).on('beforeunload',function() {
+            Channel.onClose();
+        });
+    });
+
+    socket.on('setSocket', () => {
+        chatChannel = "socket";
+        $("#relay-link").show();
+        $("#p2p-link").hide(150);
+    });
     
     //Joining to the chat
     $(document).on("click", ".chat-button", function (){
-        const user = $(this).parent().data("id");
-        const room = userId + "_" + user;
+        const user = parseInt($(this).parent().data("id"));
+        let room;
+        if(parseInt(userId) < user)
+            room = userId + "_" + user;
+        else
+            room = user + "_" + userId;
         const spinner = $(".sk-spinner-pulse");
         const server = $("#relay-link");
         const rtc = $("#p2p-link");
@@ -249,24 +273,61 @@ $(document).ready(function (){
         //Load old messages
         spinner.show();
         loadSavedMessages(room).then( result => {
-            spinner.hide();
-            server.show();
+            if(result){
+                spinner.hide();
+                server.show();
+                //Scroll to the end of chat (костыль)
+                setTimeout(() => {
+                    chatWindow.scrollTop(chatWindow.prop("scrollHeight"));
+                }, 100);
+            }
         });
+
+        addQuantityM(0,user);
 
         //Fetching username
         const username = $(this).parent().find("h4").html();
         chatDiv.find("#chatName").html(username);
+        chatDiv.find("#chatName").data("id", room);
+        currentRoom = room;
         chatWindow.data("room", room);
 
         //Enable message form
-        let form = $(".messageForm");
-        form.find(".message").prop("disabled", false);
+        $("#message").prop("disabled", false);
         
-        //saveMessage("1_3", "Hooray 3", 1);
-        //Connecting to RTC handler
-        //console.log(`Try to join ${room}`);
-        //socket.emit('room', room);
+        //Connecting to Socket.io room
+        console.log(`Joining to room ${room}`);
+        socket.emit('room', room);
 
+    });
+
+    //Send message
+    async function send(message, room) {
+        if ( chatChannel === "rtc" ){
+            Channel.sendData(message);
+        } else {
+            let json = new Object;
+            json.room = room;
+            json.message = message;
+            json.from = userId;
+            //Колхоз :Р
+            let room_users = room.split("_");
+            let us1 = room_users[0];
+            let us2 = room_users[1];
+            if(us1 === userId)
+                json.to = us2;
+            else
+                json.to = us1;
+            //Здесь кончается
+            socket.emit('sendViaSocket', json); 
+        }
+    }
+
+    //On socket message
+    socket.on('recieveViaSocket', function(data){  
+        console.log(`Recieved message via socket to the ${data.room} chat. Saving...`);
+        saveMessage(data.room, data.message, data.user);
+        addQuantityM(1, data.user);
     });
 
     //load users
@@ -294,24 +355,33 @@ $(document).ready(function (){
     //fetch saved messages
     async function loadSavedMessages(chatId){
         let dbPromise = idb.open('clientDB', 3);
-        dbPromise.onsuccess = function() {
+        dbPromise.onsuccess = await function() {
             let db = this.result;
             let dbTransaction = db.transaction(["messages"]);
             let messages = dbTransaction.objectStore("messages");
             let index = messages.index('chatId'); 
-            let requestChatHistory = index.get(chatId);
-            requestChatHistory.openCursor().onsuccess = function(event) {
+            let chatWindow = $("#chatWindow");
+            index.openCursor(chatId).onsuccess = function(event) {
                 let cursor = event.target.result;
                 if (cursor) {
-                    console.log(cursor);
+                    let self = "";
+                    if(cursor.value.user === userId) self = "self";
+                    let messageTemplate = `
+                        <div class="message ${self}">
+                            <p>${cursor.value.message}</p>
+                            <span class="time">${moment(cursor.value.timestamp).format('HH:mm:ss DD MMMM YYYY')}</span>
+                        </div><br>
+                    `;
+                    chatWindow.append(messageTemplate);
                     cursor.continue();
                 }
             };
         }
+        return true;
     }
 
     //save message to local DB
-    async function saveMessage(chatId, message, userId){
+    async function saveMessage(chatId, message, user){
         let dbPromise = idb.open('clientDB', 3);
         dbPromise.onsuccess = function() {
             let db = this.result;
@@ -319,7 +389,7 @@ $(document).ready(function (){
             let messages = dbTransaction.objectStore("messages");
             let mesObj = {
                 chatId: chatId,
-                user: userId,
+                user: user,
                 message: message,
                 timestamp: Date.now()
             };
@@ -329,11 +399,62 @@ $(document).ready(function (){
                 console.log("Something went wrong with local DB :(")
             };
             save.onsuccess = function(event) {
-                // Do something with the request.result!
-                console.log(`Message saved, id ${save.result}`);
+                //Display message if chat window opened
+                const openedChat = $("#chatName").data("id");
+                let chatWindow = $("#chatWindow");
+                if(openedChat !== undefined)
+                    if(openedChat == chatId){
+                        let self = "";
+                        if(userId == user) self = "self";
+                        let messageTemplate = `
+                        <div class="message ${self}">
+                            <p>${message}</p>
+                            <span class="time">${moment(Date.now()).format('HH:mm:ss DD MMMM YYYY')}</span>
+                        </div><br>
+                        `;
+                        chatWindow.append(messageTemplate);
+                        chatWindow.scrollTop(chatWindow.prop("scrollHeight"));
+                        $(`.user[data-id="${user}"]`).find('.chat-button').text("✉");
+                    }
             };
         }
     }
+    
+    function addQuantityM(q, user) {
+        let userId = $(`.user[data-id="${user}"]`);
+        let btn = userId.find('.chat-button');
+        if(q>0){
+            let cur = btn.text();
+            userId.prependTo("#users");
+            btn.empty();
+            if(cur !== "✉"){
+                cur = parseInt(cur);
+                let now = cur + q;
+                btn.text(now);
+            } else {
+                btn.text(q);
+            }
+        } else if (q === 0){
+            btn.text("✉");
+        }
+    }
 
-    //draw messages
+    //handle message form for submit
+    $(document).on('submit','.messageForm', (event) => {
+        event.preventDefault();
+        let messageInput = $("#message");
+
+        const message = messageInput.val();
+        messageInput.val("");
+        messageInput.prop("disabled", true);
+
+        const room = $("#chatName").data("id");
+        if(room) send(message, room).then(() => {
+            saveMessage(room, message, userId);
+            messageInput.prop("disabled", false);
+            messageInput.focus();
+        });
+
+    });
+
 })

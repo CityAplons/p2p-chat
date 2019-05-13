@@ -7,7 +7,7 @@
     <title>P2P:Dashboard</title>
     <link rel="stylesheet" type="text/css" href="styles.css">
     <link href="https://fonts.googleapis.com/css?family=Roboto:300" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/jdenticon@2.1.1" async></script>
+    <script src="https://cdn.jsdelivr.net/npm/jdenticon@2.1.1"></script>
 </head>
 <body>
     <div id="modal">
@@ -39,19 +39,9 @@
             <div class='sk-spinner-pulse'></div>
             <div id="chatWindow">
                 <!-- Scripted -->
-                <div class="message">
-                    
-                        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi nisl augue, malesuada et magna vel, eleifend hendrerit ipsum. 
-                        Ut turpis neque, condimentum eget venenatis sit amet, porta quis urna. Phasellus ipsum dolor, porttitor non luctus id, tincidunt in lectus. 
-                        Maecenas commodo enim et nisl ultricies, nec egestas turpis dictum.
-                    
-                </div>
-                <div class="message self">
-                    Etiam in ex lacinia, semper turpis quis, pharetra turpis. Nam malesuada blandit velit quis posuere. Aenean.
-                </div>
             </div>
             <form class="messageForm">
-                <input type="textarea" class="message" name="message" autocomplete="off" autofocus disabled>
+                <input type="textarea" id="message" name="message" autocomplete="off" autofocus disabled>
                 <div class="buttonInside"><input type="submit" class="submit" value="➤"></div>
             </form>
         </div>
@@ -65,6 +55,16 @@
 <script 
         src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js" 
         integrity="sha256-yr4fRk/GU1ehYJPAs8P4JlTgu0Hdsp4ZKrx8bDEDC3I=" 
+        crossorigin="anonymous">
+</script>
+<script 
+        src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.24.0/moment.min.js" 
+        integrity="sha256-4iQZ6BVL4qNKlQ27TExEhBN1HFPvAvAMbFavKKosSWQ=" 
+        crossorigin="anonymous">
+</script>
+<script 
+        src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.24.0/locale/ru.js" 
+        integrity="sha256-qR4pdhxtx7dwKGJuYGoYjfnCQBPXv47hzLLU8jPLVUY=" 
         crossorigin="anonymous">
 </script>
 <script src="client.js"></script>
