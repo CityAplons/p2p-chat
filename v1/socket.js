@@ -1,6 +1,8 @@
 /* Cheatsheet:
 
     users               (to front)            sending info about online users
+    stash               (to front)            send unrecieved messages 
+    getStash            (from front)          call for stash check
     ready               (to front)            set ready flag to activate RTC 
     close               (bi-direction)        handling close flag
     room                (from front)          join room
@@ -13,6 +15,7 @@
     setRTC              (to front)            sending flag to set type of chatting = WebRTC
 
 */
+let db = require("../models");
 
 module.exports = function (io, usermap) {
     io.sockets.on('connection', (socket) => {
@@ -62,9 +65,28 @@ module.exports = function (io, usermap) {
                 }
             }else{
                 //Sending to temporary storage in relay database
-
+                db.stash.create({ 
+                    from: from, 
+                    to: to,
+                    message: message,
+                    time: Date.now().toString() 
+                })
             }
+        });
 
+        socket.on('getStash', function(user){
+            db.stash.findAll({
+                where: {
+                  to: user
+                }
+            }).then((data) => {
+                socket.emit('stash', data);
+                db.stash.destroy({
+                    where: {
+                        to: user
+                    }
+                })
+            });
         });
         
         socket.on('candidate', function(json){
@@ -72,17 +94,14 @@ module.exports = function (io, usermap) {
         });
 
         socket.on('offer', function(json){
-            console.log('relaying offer');
             socket.to(json.room).emit('offer', json.offer);
         });
 
         socket.on('answer', function(json){
-            console.log('relaying answer');
             socket.to(json.room).emit('answer', json.answer);
         });
 
         socket.on('close', function(room){
-            console.log('closing channel');
             io.to(room).emit('setSocket');
             socket.to(room).emit('close');
         });

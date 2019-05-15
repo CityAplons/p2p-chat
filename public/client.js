@@ -21,8 +21,8 @@ $(document).ready(function (){
     dbPromise.onupgradeneeded = function(event) { 
         let db = event.target.result;
         db.createObjectStore('keys', {keyPath: 'userId'});
-        let chatHistory = db.createObjectStore('messages', { keyPath: "id", autoIncrement:true });
-        chatHistory.createIndex("chatId", "chatId", { unique: false });
+        let chatHistory = db.createObjectStore('messages', { keyPath: "timestamp" });
+        chatHistory.createIndex("chatQuery", "chatId", { unique: false });
     };
 
     //ECDH key pairs checks and generation
@@ -139,7 +139,14 @@ $(document).ready(function (){
         },
         handlePeerConnection: function(){
             Channel.peerConnection = new RTCPeerConnection({
-                iceServers: [{url: "stun:stun.l.google.com:19302" }]
+                iceServers: [
+                    {url: "stun:stun.l.google.com:19302" },
+                    {
+                        url: 'turn:turn.anyfirewall.com:443?transport=tcp',
+                        credential: 'webrtc',
+                        username: 'webrtc'
+                    }
+                ]
             });
             Channel.peerConnection.onicecandidate = Channel.onIceCandidate;
             Channel.peerConnection.ondatachannel = Channel.receiveChannelCallback;
@@ -247,7 +254,7 @@ $(document).ready(function (){
                         user = us1;
                     const stringMess = ab2str(message)
                     //Здесь кончается
-                    saveMessage(currentRoom, stringMess, user);
+                    saveMessage(currentRoom, stringMess, user, null);
                 })
             };
             receiveChannel.onclose = function(event){
@@ -262,30 +269,52 @@ $(document).ready(function (){
         closeChannel: function(){
             Channel.dataChannel.close();
             Channel.peerConnection.close();
-            Channel.peerConnection.currentRemoteDescription = undefined;
-            Channel.peerConnection.currentLocalDescription = undefined;
-            Channel.dataChannel = undefined;
-            Channel.peerConnection = undefined;
-            console.log({
-                1: Channel.dataChannel,
-                2: Channel.peerConnection
-            })
+            Channel.dataChannel = null;
+            Channel.peerConnection = null;
             numOfChannels--;
         }
     };
+
+    //Recieving stashed messages
+    socket.on('stash', (data) => {
+        $.each(data, function(index, value) {
+            const from = parseInt(value.from);
+            const to = parseInt(value.to);
+            const time = parseInt(value.time);
+            let chat;
+            if(from > to) chat = to + "_" + from;
+            else chat = from + "_" + to;
+            const parseData = JSON.parse(value.message);
+            const iv = new Uint8Array(obj2arr(parseData.iv));
+            const message = new Uint8Array(obj2arr(parseData.encMessage));
+            setEnc(from).then( aesKey => {
+                decrypt(aesKey, iv, message).then( message => {
+                    const stringMess = ab2str(message)
+                    saveMessage(chat, stringMess, from, time);
+                });
+            });
+            addQuantityM(1,from);
+        }); 
+    });
+
+    //Running RTC
+    //RTC client states
+    socket.on('ready', () => {
+        Channel.establishConnection()
+    });     
+    socket.on('answer', Channel.onAnswer);
+    socket.on('offer', Channel.onOffer);
+    socket.on('close', Channel.closeChannel);
+
+    //On successful reconection
+    socket.on('reconnect', (attemptNumber) => {
+        socket.emit('getStah', userId);
+    });
 
     socket.on('setRTC', () => {
         chatChannel = "rtc";
         $("#relay-link").hide();
         $("#p2p-link").show(150);
-        //Running RTC
-        //RTC client states
-        socket.on('ready', () => {
-            Channel.establishConnection()
-        });
-        socket.on('answer', Channel.onAnswer);
-        socket.on('offer', Channel.onOffer);
-        socket.on('close', Channel.closeChannel);
     });
 
     //Closing connection
@@ -449,7 +478,7 @@ $(document).ready(function (){
         setEnc(data.user).then( aesKey => {
             decrypt(aesKey, iv, message).then( message => {
                 const stringMess = ab2str(message)
-                saveMessage(data.room, stringMess, data.user);
+                saveMessage(data.room, stringMess, data.user, null);
             })
             addQuantityM(1, data.user);
         });
@@ -489,7 +518,6 @@ $(document).ready(function (){
                                 reject(error);
                             }; 
                             request.onsuccess = function(event) {
-                                console.log(request.result);
                                 window.crypto.subtle.importKey(
                                     "jwk", 
                                     request.result.private,
@@ -582,8 +610,24 @@ $(document).ready(function (){
 
     //load users
     socket.on('users', function (data) {
-        $("#users").empty();
+        let curUsers = new Array();
+        $('.user[data-id]').each(function() {
+            let cur = $(this).data('id');
+            curUsers.push(cur);
+        });
+        
+        let list = data;
+        list = list.filter(item => item != userId);
+        curUsers.forEach(element => {
+            list = list.filter(item => item != element);
+        });
+        let unlist = curUsers;
         data.forEach(element => {
+            unlist = unlist.filter(item => item != element);
+        });
+        
+        //Adding user
+        list.forEach(element => {
             if(element != userId)
             $.ajax({
                 type: "GET",
@@ -600,6 +644,10 @@ $(document).ready(function (){
                 }
             });
         });
+        //Remove user
+        unlist.forEach(element => {
+            $(`.user[data-id=${element}]`).remove();
+        });
     });
 
     //fetch saved messages
@@ -609,9 +657,9 @@ $(document).ready(function (){
             let db = this.result;
             let dbTransaction = db.transaction(["messages"]);
             let messages = dbTransaction.objectStore("messages");
-            let index = messages.index('chatId'); 
+            let index = messages.index('chatQuery'); 
             let chatWindow = $("#chatWindow");
-            index.openCursor(chatId).onsuccess = function(event) {
+            index.openCursor(chatId, "next").onsuccess = function(event) {
                 let cursor = event.target.result;
                 if (cursor) {
                     let self = "";
@@ -631,17 +679,20 @@ $(document).ready(function (){
     }
 
     //save message to local DB
-    async function saveMessage(chatId, message, user){
+    async function saveMessage(chatId, message, user, timestamp){
         let dbPromise = idb.open('clientDB', 3);
         dbPromise.onsuccess = function() {
             let db = this.result;
             let dbTransaction = db.transaction(["messages"], 'readwrite');
             let messages = dbTransaction.objectStore("messages");
+            let time;
+            if(timestamp !== null) time = parseInt(timestamp);
+            else time = Date.now();
             let mesObj = {
                 chatId: chatId,
                 user: user,
                 message: message,
-                timestamp: Date.now()
+                timestamp: time
             };
             let save = messages.add(mesObj);
             save.onerror = function(event) {
@@ -689,6 +740,9 @@ $(document).ready(function (){
         }
     }
 
+    //Checking for unrecieved messages
+    if(userId !== undefined) socket.emit('getStash', userId);
+
     //handle message form for submit
     $(document).on('submit','.messageForm', (event) => {
         event.preventDefault();
@@ -700,7 +754,7 @@ $(document).ready(function (){
 
         const room = $("#chatName").data("id");
         if(room) send(message, room).then(() => {
-            saveMessage(room, message, userId);
+            saveMessage(room, message, userId, null);
             messageInput.prop("disabled", false);
             messageInput.focus();
         });
