@@ -1,4 +1,4 @@
-* {box-sizing: border-box;font-family: 'Roboto', sans-serif; margin: 0 !important;}
+* {box-sizing: border-box;font-family: 'Roboto', sans-serif; margin: 0;}
 
 body {
     width: 100%;
@@ -39,9 +39,8 @@ small{
 }
 
 div#formal form{
-    margin: 5%;
     width: 100%;
-    padding: 30% 0 30% 0;
+    padding: 30% 10%;
     z-index: 10;
     -webkit-box-sizing: border-box; /* For legacy WebKit based browsers */
      -moz-box-sizing: border-box; /* For legacy (Firefox <29) Gecko based browsers */
