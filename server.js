@@ -1,9 +1,23 @@
 let express = require('express');
 let exphbs = require('express-handlebars');
 let app = express();
-let http = require('http').Server(app);
-let io = require('socket.io')(http);
+let https = require('https');
+const fs = require('fs');
 
+let options = {
+    key: fs.readFileSync('./file.pem'),
+    cert: fs.readFileSync('./file.crt')
+};
+
+let server = https.createServer(options, app);
+// Redirect from http port 80 to https
+let http = require('http');
+http.createServer(function (req, res) {
+    res.writeHead(301, { "Location": "https://" + req.headers['host'] + req.url });
+    res.end();
+}).listen(80);
+
+let io         = require('socket.io')(server);
 let passport   = require('passport');
 let session    = require('express-session');
 let bodyParser = require('body-parser');
@@ -55,4 +69,4 @@ models.sequelize.sync().then(function() {
 //load passport strategies
 require('./config/passport/passport.js')(passport, models.user);
 
-http.listen(8080, () => console.log('Relay is online!'));
+server.listen(443, () => console.log('Relay with SSL is online!'));

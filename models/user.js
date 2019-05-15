@@ -16,8 +16,14 @@ module.exports = function(sequelize, Sequelize) {
         username: {
             type: Sequelize.STRING,
             unique: true,
-            allowNull: false,
-            notEmpty: true
+            notEmpty: true,
+            validate: {
+                isUser: function ( value ) {
+                  if ( !/[A-Za-z0-9]+/g.test(value) ) {
+                    throw new Error('Username validation error!')
+                  }
+                },
+            }
         },
         public_key: {
             type: Sequelize.TEXT

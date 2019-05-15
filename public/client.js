@@ -128,7 +128,7 @@ $(document).ready(function (){
     })
     
     //WebSocket connection to relay
-    let socket = io.connect("", { query: `user=${userId}` });
+    let socket = io.connect("", { query: `user=${userId}`, secure: true });
 
     //Channel controllers
     let numOfChannels = 0;
@@ -252,9 +252,8 @@ $(document).ready(function (){
                         user = us2;
                     else if(us2 == userId)
                         user = us1;
-                    const stringMess = ab2str(message)
                     //Здесь кончается
-                    saveMessage(currentRoom, stringMess, user, null);
+                    saveMessage(currentRoom, message, user, null);
                 })
             };
             receiveChannel.onclose = function(event){
@@ -289,8 +288,7 @@ $(document).ready(function (){
             const message = new Uint8Array(obj2arr(parseData.encMessage));
             setEnc(from).then( aesKey => {
                 decrypt(aesKey, iv, message).then( message => {
-                    const stringMess = ab2str(message)
-                    saveMessage(chat, stringMess, from, time);
+                    saveMessage(chat, message, from, time);
                 });
             });
             addQuantityM(1,from);
@@ -403,6 +401,9 @@ $(document).ready(function (){
     }  
 
     async function encrypt(key, message) {
+        let e = message;
+        e = window.btoa(unescape(encodeURIComponent(e)));
+        e = str2ab(e);
         return new Promise((resolve, reject) => {
             const iv = window.crypto.getRandomValues(new Uint8Array(16))
             window.crypto.subtle.encrypt(
@@ -411,7 +412,7 @@ $(document).ready(function (){
                     iv
                 },
                 key,
-                str2ab(message)
+                e
             )
             .then(function(encrypted){
                 const encMessage = new Uint8Array(encrypted);
@@ -436,7 +437,11 @@ $(document).ready(function (){
             )
             .then(function(decrypted){
                 //returns an ArrayBuffer containing the decrypted data
-                resolve(new Uint8Array(decrypted));
+                let d = new Uint8Array(decrypted);
+                d = d.filter(Number);
+                d = ab2str(d);
+                d = decodeURIComponent(escape(window.atob(d)));
+                resolve(d);
             })
             .catch(function(err){
                 console.error(err);
@@ -477,8 +482,7 @@ $(document).ready(function (){
         const message = new Uint8Array(obj2arr(parseData.encMessage));
         setEnc(data.user).then( aesKey => {
             decrypt(aesKey, iv, message).then( message => {
-                const stringMess = ab2str(message)
-                saveMessage(data.room, stringMess, data.user, null);
+                saveMessage(data.room, message, data.user, null);
             })
             addQuantityM(1, data.user);
         });
