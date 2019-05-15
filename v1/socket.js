@@ -49,7 +49,6 @@ module.exports = function (io, usermap) {
             const message = json.message;
             const from = json.from;
             const to = json.to;
-            console.log(json);
             let toSocketId = usermap[to];
             if(toSocketId !== undefined){
                 //Sending to client directly
@@ -60,7 +59,6 @@ module.exports = function (io, usermap) {
                 }
                 for(let index in toSocketId) {
                     socket.to(toSocketId[index][0].id).emit('recieveViaSocket', answer);
-                    console.log(toSocketId[index][0].id);
                 }
             }else{
                 //Sending to temporary storage in relay database
@@ -85,8 +83,8 @@ module.exports = function (io, usermap) {
 
         socket.on('close', function(room){
             console.log('closing channel');
-            socket.to(room).emit('close');
             io.to(room).emit('setSocket');
+            socket.to(room).emit('close');
         });
 
         //Emty socket on disconnect

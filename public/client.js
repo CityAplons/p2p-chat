@@ -2,6 +2,7 @@ $(document).ready(function (){
     //Globals
     const username = $("#user").html();
     const userId = $("#user").data("id");
+    let currentAesKey;
     let chatChannel = "socket";
     let currentRoom = "";
 
@@ -41,35 +42,51 @@ $(document).ready(function (){
                     ["deriveKey", "deriveBits"]
                   ).then((keyPair) => {
                     console.log(`No keypair found on this account! Generating new one...`);
-                    console.log(keyPair);
-                    let txAddKey = db.transaction('keys', 'readwrite');
-                    let keyDB = txAddKey.objectStore('keys');
-                    let item = {
-                        userId: userId,
-                        key: keyPair
-                    };
-                    keyDB.add(item); 
-                    sendKey(keyPair.publicKey);          
+                    window.crypto.subtle.exportKey(
+                        "jwk",
+                        keyPair.privateKey 
+                    )
+                    .then(function(keydata){
+                        const private = keydata;
+                        window.crypto.subtle.exportKey(
+                            "jwk", 
+                            keyPair.publicKey
+                        )
+                        .then(function(keydata2){
+                            const public = keydata2;
+                            let txAddKey = db.transaction('keys', 'readwrite');
+                            let keyDB = txAddKey.objectStore('keys');
+                            let item = {
+                                userId: userId,
+                                private: private,
+                                public: public
+                            };
+                            console.log(item);
+                            keyDB.put(item); 
+                            sendKey(public); 
+                        })
+                        .catch(function(err){
+                            console.error(err);
+                        });      
+                    })
+                    .catch(function(err){
+                        console.error(err);
+                    });   
                 }); 
             } else {
-                sendKey(this.result.key.publicKey);
+                sendKey(this.result.public);
             }
         }
         function sendKey(pubKey){
             //Send current public key to relay
-            window.crypto.subtle.exportKey(
-                "jwk",
-                pubKey
-            ).then(function(keydata){
-                $.ajax({
-                    type: "POST",
-                    url: `/${userId}/updateKey`,
-                    data: { raw: JSON.stringify(keydata) },
-                    success: function(data){
-                        console.log("Key data on relay was successfully updated!");
-                    }
-                });
-            })
+            $.ajax({
+                type: "POST",
+                url: `/${userId}/updateKey`,
+                data: { raw: JSON.stringify(pubKey) },
+                success: function(data){
+                    console.log("Key data on relay was successfully updated!");
+                }
+            });
         }
     
     }
@@ -203,6 +220,7 @@ $(document).ready(function (){
     
             Channel.dataChannel.onclose = function(){
                 console.log('channel closed');
+                Channel.dataChannel = null;
             };
     
         },
@@ -214,17 +232,26 @@ $(document).ready(function (){
                 if(numOfChannels < 1) Channel.establishConnection();
             };
             receiveChannel.onmessage = function(event){
-                //Колхоз :Р
-                let room_users = currentRoom.split("_");
-                let user = "";
-                let us1 = room_users[0];
-                let us2 = room_users[1];
-                if(us1 == userId)
-                    user = us2;
-                else if(us2 == userId)
-                    user = us1;
-                //Здесь кончается
-                saveMessage(currentRoom, event.data, user);
+                const parseData = JSON.parse(event.data);
+                const iv = new Uint8Array(obj2arr(parseData.iv));
+                const message = new Uint8Array(obj2arr(parseData.encMessage));
+                decrypt(currentAesKey, iv, message).then( message => {
+                    //Костыль :Р
+                    let room_users = currentRoom.split("_");
+                    let user = "";
+                    let us1 = room_users[0];
+                    let us2 = room_users[1];
+                    if(us1 == userId)
+                        user = us2;
+                    else if(us2 == userId)
+                        user = us1;
+                    const stringMess = ab2str(message)
+                    //Здесь кончается
+                    saveMessage(currentRoom, stringMess, user);
+                })
+            };
+            receiveChannel.onclose = function(event){
+                event.channel = null;
             };
         },
         onClose: function(){
@@ -235,6 +262,14 @@ $(document).ready(function (){
         closeChannel: function(){
             Channel.dataChannel.close();
             Channel.peerConnection.close();
+            Channel.peerConnection.currentRemoteDescription = undefined;
+            Channel.peerConnection.currentLocalDescription = undefined;
+            Channel.dataChannel = undefined;
+            Channel.peerConnection = undefined;
+            console.log({
+                1: Channel.dataChannel,
+                2: Channel.peerConnection
+            })
             numOfChannels--;
         }
     };
@@ -254,7 +289,7 @@ $(document).ready(function (){
     });
 
     //Closing connection
-    $( document ).on('beforeunload',function() {
+    $( window ).on('beforeunload',function() {
         if(chatChannel == "rtc") Channel.onClose();
     });
 
@@ -278,6 +313,11 @@ $(document).ready(function (){
         let chatWindow = $("#chatWindow");
         let chatDiv = $(".chat");
 
+        //Setting up encryption
+        setEnc(parseInt(user)).then( key => {
+            currentAesKey = key;
+        });
+    
         //Clearing chat
         chatDiv.removeClass("disabled");
         if(chatChannel == "rtc") Channel.onClose();
@@ -314,34 +354,231 @@ $(document).ready(function (){
 
     });
 
-    //Send message
-    async function send(message, room) {
-        if ( chatChannel === "rtc" ){
-            Channel.sendData(message);
-        } else {
-            let json = new Object;
-            json.room = room;
-            json.message = message;
-            json.from = userId;
-            //Колхоз :Р
-            let room_users = room.split("_");
-            let us1 = room_users[0];
-            let us2 = room_users[1];
-            if(us1 == userId)
-                json.to = us2;
-            else if(us2 == userId)
-                json.to = us1;
-            //Здесь кончается
-            socket.emit('sendViaSocket', json); 
+    //Text to ArrayBuffer
+    function ab2str(buf) {
+        return String.fromCharCode.apply(null, new Uint8Array(buf));
+    }
+    function str2ab(str) {
+        var buf = new ArrayBuffer(str.length*2); // 2 bytes for each char
+        var bufView = new Uint8Array(buf);
+        for (var i=0, strLen=str.length; i < strLen; i++) {
+            bufView[i] = str.charCodeAt(i);
         }
+        return buf;
+    }
+    function obj2arr(obj){
+        let result = Object.keys(obj).map(function(key) {
+            return [obj[key]];
+        });
+        return result;
+    }  
+
+    async function encrypt(key, message) {
+        return new Promise((resolve, reject) => {
+            const iv = window.crypto.getRandomValues(new Uint8Array(16))
+            window.crypto.subtle.encrypt(
+                {
+                    name: "AES-CBC",
+                    iv
+                },
+                key,
+                str2ab(message)
+            )
+            .then(function(encrypted){
+                const encMessage = new Uint8Array(encrypted);
+                ans = { encMessage, iv }
+                resolve(ans)
+            })
+            .catch(function(err){
+                console.error(err);
+            });
+        });
+    }
+
+    async function decrypt(key, secret, message) {
+        return new Promise((resolve, reject) => {
+            window.crypto.subtle.decrypt(
+                {
+                    name: "AES-CBC",
+                    iv: secret,
+                },
+                key,
+                message
+            )
+            .then(function(decrypted){
+                //returns an ArrayBuffer containing the decrypted data
+                resolve(new Uint8Array(decrypted));
+            })
+            .catch(function(err){
+                console.error(err);
+            });
+        });
+    }
+
+    //Send message
+    async function send(message, room) {    //data contains encMessage and iv
+        encrypt(currentAesKey, message).then( data => {
+            if ( chatChannel === "rtc" ){
+                Channel.sendData(JSON.stringify(data));
+            } else {
+                const enc = JSON.stringify(data);
+                let json = new Object;
+                json.room = room;
+                json.message = enc;
+                json.from = userId;
+                //Костыль :Р
+                let room_users = room.split("_");
+                let us1 = room_users[0];
+                let us2 = room_users[1];
+                if(us1 == userId)
+                    json.to = us2;
+                else if(us2 == userId)
+                    json.to = us1;
+                //Здесь кончается
+                socket.emit('sendViaSocket', json); 
+            }
+        })
     }
 
     //On socket message
     socket.on('recieveViaSocket', function(data){  
         console.log(`Recieved message via socket to the ${data.room} chat. Saving...`);
-        saveMessage(data.room, data.message, data.user);
-        addQuantityM(1, data.user);
+        const parseData = JSON.parse(data.message);
+        const iv = new Uint8Array(obj2arr(parseData.iv));
+        const message = new Uint8Array(obj2arr(parseData.encMessage));
+        setEnc(data.user).then( aesKey => {
+            decrypt(aesKey, iv, message).then( message => {
+                const stringMess = ab2str(message)
+                saveMessage(data.room, stringMess, data.user);
+            })
+            addQuantityM(1, data.user);
+        });
     });
+
+    //Get public key
+    async function getPublicKey(id){
+        try {
+            let req = await $.ajax({
+                type: "GET",
+                url: `/${id}/getUserInfo`,
+            });
+            return req;
+        } catch (error) {
+            console.error(error);
+        }    
+    }
+
+    //Generate chat key encryption
+    async function setEnc(id){
+        return new Promise(
+            (gResolve, gReject) => {
+            getPublicKey(id).then((data) => {
+                //Foreign key
+                const sKey = JSON.parse(data['key']);
+                //Fetching keypair from db
+                let fetchYourthKey = () => {
+                    return new Promise(
+                    (resolve, reject) => {
+                        let dbPromise = idb.open('clientDB', 3);
+                        dbPromise.onsuccess = function() {
+                            let db = this.result;
+                            let dbTransaction = db.transaction(["keys"]);
+                            let getKeys = dbTransaction.objectStore("keys");
+                            let request = getKeys.get(userId);
+                            request.onerror = function(event) {
+                                reject(error);
+                            }; 
+                            request.onsuccess = function(event) {
+                                console.log(request.result);
+                                window.crypto.subtle.importKey(
+                                    "jwk", 
+                                    request.result.private,
+                                    { 
+                                        name: "ECDH",
+                                        namedCurve: "P-521", 
+                                    },
+                                    true, 
+                                    ["deriveKey", "deriveBits"]
+                                )
+                                .then(function(privateKey){
+                                    const private = privateKey;
+                                    window.crypto.subtle.importKey(
+                                        "jwk", 
+                                        request.result.public,
+                                        { 
+                                            name: "ECDH",
+                                            namedCurve: "P-521", 
+                                        },
+                                        true, 
+                                        []
+                                    )
+                                    .then(function(publicKey){
+                                        const public = publicKey;
+                                        const key = {
+                                            publicKey: public,
+                                            privateKey: private
+                                        }
+                                        resolve(key);
+                                    })
+                                    .catch(function(err){
+                                        console.error(err);
+                                    });
+                                })
+                                .catch(function(err){
+                                    console.error(err);
+                                });
+                            };
+                        }    
+                    })
+                };
+                fetchYourthKey().then(
+                    key => {
+                        //Importing public key
+                        window.crypto.subtle.importKey(
+                            "jwk",
+                            sKey,
+                            {   
+                                name: "ECDH",
+                                namedCurve: "P-521", 
+                            },
+                            false,
+                            []
+                        )
+                        .then(function(sPublicKey){
+                            const yKey = key;
+                            //Generating encryption key
+                            window.crypto.subtle.deriveKey(
+                                {
+                                    name: "ECDH",
+                                    namedCurve: "P-521",
+                                    public: sPublicKey,
+                                },
+                                yKey.privateKey,
+                                {
+                                    name: "AES-CBC",
+                                    length: 256,
+                                },
+                                false,
+                                ["encrypt", "decrypt"]
+                            )
+                            .then(function(keydata){
+                                //returns the exported key data
+                                gResolve(keydata);
+                            })
+                            .catch(function(err){
+                                console.error(err);
+                            });
+                        })
+                        .catch(function(err){
+                            console.error(err);
+                        });
+                    }
+                ).catch(function(err){
+                    console.error(err);
+                });
+            });
+        })
+    }
 
     //load users
     socket.on('users', function (data) {
