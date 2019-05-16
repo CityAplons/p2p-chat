@@ -306,7 +306,7 @@ $(document).ready(function (){
 
     //On successful reconection
     socket.on('reconnect', (attemptNumber) => {
-        socket.emit('getStah', userId);
+        socket.emit('getStash', userId);
     });
 
     socket.on('setRTC', () => {
