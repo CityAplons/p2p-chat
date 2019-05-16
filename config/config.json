@@ -1,9 +1,8 @@
-//Database confiduration
 {
     "development": {
-      "database": "",
-      "username": "",
-      "password": "",
+      "database": "relay",
+      "username": "relay",
+      "password": "1235",
       "host": "127.0.0.1",
       "dialect": "postgres",
       "logging": false
